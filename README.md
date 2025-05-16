@@ -45,22 +45,27 @@ cd sensor_template
 
 ### Usage
 
-To create a custom bicycle sensor, extend the `BicycleSensor` class
-and implement the abstract methods: `write_header()` and
-`write_measurement()`. The provided `SensorTemplate` class serves as
-an example implementation that records the current time as a sensor
-measurement.
+To create a custom bicycle sensor, extend the `BicycleSensor` class and implement the abstract methods: `write_header(self)` and `write_measurement(self, data=None)`. The provided `SensorTemplate` class serves as an example implementation that records the current time as a sensor measurement.
+
+**Key points:**
+- `write_header()` must return the CSV header as a string.
+- `write_measurement(data=None)` is called for each measurement. For periodic measurements, `data` is `None`. For event-based measurements, `data` contains event information.
+- Optionally, you can define a `background_worker()` method that returns a function to be run in its own thread. This can be used to trigger measurements based on events (e.g., button presses).
 
 Example:
-
 ```python
 class MyCustomSensor(BicycleSensor):
-    def write_header(self):
-        self.write_to_file('time, speed')
-
-    def write_measurement(self):
-        speed = get_speed_data()  # Replace with actual sensor logic
-        self.write_to_file(f"{time.time()}, {speed}")
+  def write_header(self):
+    return 'time,speed'
+  def write_measurement(self, data=None):
+    speed = get_speed_data() if data is None else data
+    self.data_buffer.append(f"{time.time()},{speed}")
+  def background_worker(self):
+    def worker():
+      while self.alive:
+        if event_detected():
+          self.write_measurement(data=get_event_speed())
+    return worker
 ```
 
 ### Example Usage
@@ -81,7 +86,7 @@ command:
   `WARNING`). Default is `INFO`.
 - `--measurement-frequency` (optional): Frequency of sensor
   measurements in Hertz (measurements per second). Default is `1.0
-  Hz`.
+  Hz`. Setting it to `0` disables periodic measurements entirely.
 - `--stdout` (optional): Enable logging output to the console
   (stdout).
 - `--upload-interval` (optional): Interval between data uploads in
