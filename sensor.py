@@ -5,7 +5,7 @@ import random
 import time
 from datetime import datetime
 
-from BicycleSensor import BicycleSensor, configure
+from BicycleSensor import BicycleSensor, setup_logging
 
 
 class SensorTemplate(BicycleSensor):
@@ -43,8 +43,7 @@ if __name__ == '__main__':
   PARSER.add_argument('--upload-interval', type=float, default=300.0, help='Interval between uploads in seconds')
   ARGS = PARSER.parse_args()
 
-  # Configure logging
-  configure(stdout=ARGS.stdout, rotating=True, loglevel=ARGS.loglevel)
+  setup_logging('sensor_template.log', stdout=ARGS.stdout, rotating=True, loglevel=ARGS.loglevel)
 
   # Instantiate and run the sensor
   sensor = SensorTemplate(ARGS.name, ARGS.hash, ARGS.measurement_frequency, ARGS.upload_interval)
