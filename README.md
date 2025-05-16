@@ -56,15 +56,16 @@ Example:
 ```python
 class MyCustomSensor(BicycleSensor):
   def write_header(self):
-    return 'time,speed'
+    return 'time,speed,button'
   def write_measurement(self, data=None):
-    speed = get_speed_data() if data is None else data
-    self.data_buffer.append(f"{time.time()},{speed}")
+    speed = get_speed_data()
+    button = 0 if data is None else 1
+    self.data_buffer.append(f"{time.time()},{speed},{button}")
   def background_worker(self):
     def worker():
       while self.alive:
         if event_detected():
-          self.write_measurement(data=get_event_speed())
+          self.write_measurement(data=True)
     return worker
 ```
 
