@@ -67,7 +67,7 @@ class BicycleSensor(ABC):
   def __init__(self, name, hash, measurement_frequency, upload_interval):
     self._name = name
     self._hash = hash
-    self._measurement_frequency = measurement_frequency
+    self._measurement_interval = 1.0 / measurement_frequency if measurement_frequency > 0 else None
     self._upload_interval = upload_interval
     self.alive = True
     self.data_buffer = deque()
@@ -82,6 +82,7 @@ class BicycleSensor(ABC):
     ]))
 
     self.upload_event = threading.Event()
+    self.measurement_event = threading.Event()
 
     signal.signal(signal.SIGTERM, self._handle_shutdown)
     signal.signal(signal.SIGINT, self._handle_shutdown)
@@ -117,6 +118,7 @@ class BicycleSensor(ABC):
     logging.warning(f'Shutdown signal received: {signum}')
     self.alive = False
     self.upload_event.set()
+    self.measurement_event.set()
 
   def _upload_data_loop(self):
     while self.alive:
@@ -166,13 +168,18 @@ class BicycleSensor(ABC):
   def main(self):
     while self.alive:
       try:
+        self.measurement_event.wait(timeout=self._measurement_interval)
         self.write_measurement()
-        time.sleep(1.0 / self._measurement_frequency)
+        self.measurement_event.clear()
       except Exception:
         logging.error("Error in main loop:")
         logging.error(traceback.format_exc())
 
+    logging.warning('Waiting for upload thread...')
     self.upload_thread.join()
+
     if self.custom_thread:
+      logging.warning('Waiting for custom worker thread...')
       self.custom_thread.join()
+
     logging.warning('Sensor main loop stopped')
