@@ -130,9 +130,9 @@ class BicycleSensor(ABC):
         logging.error(f"Error opening file '{filename}': {e}")
         return
 
-      for line in self.data_buffer:
+      while self.data_buffer:
+        line = self.data_buffer.popleft()
         file.write(line + '\n')
-      self.data_buffer.clear()
       file.close()
       self._upload_queue.append(filename)
 
