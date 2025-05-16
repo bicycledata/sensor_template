@@ -89,8 +89,6 @@ class BicycleSensor(ABC):
     self.upload_thread = threading.Thread(target=self._upload_data_loop, daemon=True)
     self.upload_thread.start()
 
-    self.trigger_upload()
-
     # Launch background worker, if implemented
     worker_func = self.background_worker()
     if callable(worker_func):
@@ -98,6 +96,8 @@ class BicycleSensor(ABC):
       self.custom_thread.start()
     else:
       self.custom_thread = None
+
+    self.upload_event.set() # Trigger immediate upload of existing files
 
   @abstractmethod
   def write_header(self) -> str:
@@ -118,8 +118,15 @@ class BicycleSensor(ABC):
     self.alive = False
     self.upload_event.set()
 
-  def trigger_upload(self):
-    '''Trigger a file rotation and queue current buffer for upload.'''
+  def _upload_data_loop(self):
+    while self.alive:
+      self.upload_event.wait(timeout=self._upload_interval)
+      self._upload_data()
+      self.upload_event.clear()
+
+    logging.warning('Upload thread stopped')
+
+  def _upload_data(self):
     if self.data_buffer:
       filename = os.path.join('pending', datetime.now().strftime('%Y%m%d_%H%M%S.csv'))
       try:
@@ -136,21 +143,6 @@ class BicycleSensor(ABC):
       file.close()
       self._upload_queue.append(filename)
 
-    self.upload_event.set()
-
-  def _upload_data_loop(self):
-    while self.alive:
-      self.upload_event.wait()
-      self._upload_data()
-      self.upload_event.clear()
-
-    # Final upload after shutdown
-    logging.warning('Upload thread stopped - final upload attempt')
-    self.trigger_upload()
-    self._upload_data()
-    logging.warning('Upload thread stopped')
-
-  def _upload_data(self):
     try:
       while self._upload_queue:
         filename = self._upload_queue[0]
@@ -172,15 +164,9 @@ class BicycleSensor(ABC):
       logging.error(traceback.format_exc())
 
   def main(self):
-    next_upload_time = time.time() + self._upload_interval
-
     while self.alive:
       try:
         self.write_measurement()
-        if time.time() >= next_upload_time:
-          self.trigger_upload()
-          next_upload_time = time.time() + self._upload_interval
-
         time.sleep(1.0 / self._measurement_frequency)
       except Exception:
         logging.error("Error in main loop:")
